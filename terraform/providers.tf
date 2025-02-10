@@ -13,7 +13,5 @@ terraform {
 
 # Select the provider we are going to use
 provider "azurerm" {
-    features {
-    
-    }
+  features {}
 }

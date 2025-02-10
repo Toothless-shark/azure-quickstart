@@ -1,11 +1,11 @@
 # Resource Group
 resource "azurerm_resource_group" "rg" {
-    location = "westeurope"
-    name     = "${random_pet.prefix.id}-rg"
+  location = var.resource_group_location
+  name     = "${random_pet.prefix.id}-rg"
 }
 
 resource "random_pet" "prefix" {
-  prefix = "toothless"
+  prefix = var.resource_group_name_prefix
   length = 1
 }
 
