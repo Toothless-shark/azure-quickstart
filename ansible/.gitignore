@@ -1,0 +1,7 @@
+# ssh key pair
+id_rsa
+/ansible_docker/id_rsa.pub
+
+
+ssh_steps
+/inventory.ini
