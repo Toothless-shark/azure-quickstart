@@ -1,0 +1,15 @@
+- name: Provisionner la VM et déployer l'application
+  hosts: webserver
+  tasks:
+    - name: Ping my hosts
+      ansible.builtin.ping:
+ 
+    - name: Copy file hosts with permissions
+      ansible.builtin.copy:
+        src: ./confirmation
+        dest: ~/
+        mode: '0644'
+      
+    - name: Print the file content
+      debug:
+        msg: "{{ lookup('file', 'confirmation') }}"
