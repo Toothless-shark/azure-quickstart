@@ -1,15 +1,127 @@
 - name: Provisionner la VM et déployer l'application
   hosts: webserver
+  become: yes
+  vars_files:
+    - vars.yaml
   tasks:
-    - name: Ping my hosts
-      ansible.builtin.ping:
- 
-    - name: Copy file hosts with permissions
-      ansible.builtin.copy:
-        src: ./confirmation
-        dest: ~/
-        mode: '0644'
+    - name: Mettre à jour les paquets
+      apt:
+        update_cache: yes
+        state: latest
+
+    - name: Installer les dépendances avec apt-get
+      command: apt-get install -y python3-venv python3-pip nodejs npm nginx
+      become: yes
+
+    - name: Installer `n`, le gestionnaire de versions Node.js
+      npm:
+        name: n
+        global: yes
       
-    - name: Print the file content
+    - name: Installer la dernière version LTS de Node.js avec `n`
+      command: n lts
+      args:
+        creates: /usr/local/bin/node
+  
+    - name: Vérifier la version installée de Node.js
+      command: node -v
+      register: node_version
+  
+    - name: Afficher la version de Node.js installée
       debug:
-        msg: "{{ lookup('file', 'confirmation') }}"
+        msg: "Version actuelle de Node.js : {{ node_version.stdout }}"
+
+    - name: Cloner l'application depuis GitHub
+      git:
+        repo: "https://github.com/Toothless-shark/Secure-Web-App.git"
+        dest: "/home/{{ user }}/app"
+        version: master
+        force: yes
+      become: no
+      remote_user: "{{ user }}"
+
+    - name: Créer un environnement virtuel Python
+      command: python3 -m venv /home/{{ user }}/app/backend/venv
+      become: no
+      remote_user: "{{ user }}"
+
+    - name: Installer les dépendances Backend dans l'environnement virtuel
+      pip:
+        requirements: "/home/{{ user }}/app/backend/requirements.txt"
+        virtualenv: "/home/{{ user }}/app/backend/venv"
+
+
+    - name: Installer les dépendances frontend avec --legacy-peer-deps
+      command: npm install --legacy-peer-deps
+      args:
+        chdir: "/home/{{ user }}/app/frontend"
+      become: yes
+      become_user: "{{ user }}"
+
+    - name: Remplacer l'URL dans le fichier api.js
+      replace:
+        path: "/home/{{ user }}/app/frontend/src/services/api.js"
+        regexp: 'http://127.0.0.1:5000'
+        replace: '/api'
+      become: no
+      remote_user: "{{ user }}"
+
+    - name: Vérifier si le groupe adminuser existe
+      command: "getent group '{{ adminuser }}'"
+      register: group_check
+      ignore_errors: yes
+
+    - name: Ajouter www-data au groupe adminuser
+      user:
+        name: www-data
+        groups: "{{ user }}"
+        append: yes
+
+    - name: Build le frontend
+      command: "npm run build"
+      args:
+        chdir: "/home/{{ user }}/app/frontend"
+      become: no
+      remote_user: "{{ user }}"
+
+    - name: Configurer Nginx pour frontend et backend
+      copy:
+        dest: "/etc/nginx/sites-available/default"
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  root /home/{{ user }}/app/frontend/build;
+                  index index.html;
+                  try_files $uri /index.html;
+              }
+
+              location /api/ {
+                  proxy_pass http://127.0.0.1:5000/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+
+              error_page 500 502 503 504 /50x.html;
+              location = /50x.html {
+                  root /usr/share/nginx/html;
+              }
+          }
+      become: yes
+
+    - name: Redémarrer Nginx pour appliquer la nouvelle configuration
+      command: sudo service nginx restart
+      become: yes
+
+    - name: Lancer le frontend en background
+      shell: "nohup npx serve -s /home/{{ user }}/app/frontend/build > frontend.log 2>&1 &"
+      become: no
+      remote_user: "{{ user }}"
+
+    - name: Lancer le backend en background
+      raw: "source /home/{{ user }}/app/backend/venv/bin/activate && nohup python3 /home/{{ user }}/app/backend/app.py > backend.log 2>&1 &"
+      become: no
+      remote_user: "{{ user }}"

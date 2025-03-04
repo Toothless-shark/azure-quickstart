@@ -1,0 +1,9 @@
+# ssh key pair
+id_rsa
+id_rsa.pub
+
+# terraform files
+.terraform
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup

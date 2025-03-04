@@ -1,10 +1,10 @@
 variable "public_key_loc" {
-  default = "/home/aymen/Desktop/Terraform/azure-quickstart/terraform/id_rsa.pub"
+  default = "/home/shark/Desktop/1/terraform-azure-quickstart/terraform/id_rsa.pub"
 }
 
 variable "resource_group_location" {
   type        = string
-  default     = "westeurope"
+  default     = "francecentral"
   description = "Location of the resource group"
 }
 
